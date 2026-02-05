@@ -1,0 +1,31 @@
+/**
+ * EXECUTE ESTA FUNÇÃO PARA RODAR O POP-UP DE AUTORIZAÇÃO
+ * Ela toca em todos os serviços que o sistema usa.
+ */
+function CONCEDER_PERMISSOES_GAIUS() {
+  // 1. Toca no Calendar
+  var cal = CalendarApp.getDefaultCalendar();
+  Logger.log("Agenda acessada: " + cal.getName());
+
+  // 2. Toca no Gmail
+  var threads = GmailApp.search('label:PJe', 0, 1);
+  Logger.log("Gmail acessado. Threads encontradas: " + threads.length);
+
+  // 3. Toca no Tasks (Se o serviço estiver adicionado no +)
+  try {
+    var taskLists = Tasks.Tasklists.list();
+    Logger.log("Tasks acessado. Listas encontradas: " + taskLists.items.length);
+  } catch(e) {
+    Logger.log("ERRO TASKS: Verifique se clicou no '+' ao lado de Serviços e adicionou 'Tasks API'");
+  }
+
+  // 4. Toca no Drive
+  var root = DriveApp.getRootFolder();
+  Logger.log("Drive acessado: " + root.getName());
+
+  // 5. Toca na Planilha
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  Logger.log("Planilha acessada: " + ss.getName());
+  
+  Browser.msgBox("Autorização Concluída! Se o Tasks deu erro no log, você esqueceu de adicionar o serviço no botão + lateral.");
+}
