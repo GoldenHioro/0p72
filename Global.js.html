@@ -1,0 +1,103 @@
+<script>
+  // Variável para controle de estado da rota
+  window.rotaAtual = '';
+
+  /**
+   * FUNÇÃO PRINCIPAL DE NAVEGAÇÃO
+   */
+  /**
+ * MOTOR DE NAVEGAÇÃO (Global.js.html)
+ */
+  function navegar(rota) {
+    console.log("Navegando para: " + rota);
+    window.rotaAtual = rota;
+    
+    const container = document.getElementById('app-content');
+    const titulo = document.getElementById('titulo-pagina');
+
+    // 1. Atualiza Título e mostra Spinner
+    if(titulo) titulo.innerText = rota.charAt(0).toUpperCase() + rota.slice(1);
+    
+    if(container) {
+      container.innerHTML = `
+        <div class="flex flex-col items-center justify-center h-full text-slate-400">
+          <i class="fas fa-circle-notch fa-spin fa-3x mb-4 text-blue-500"></i>
+          <p>Carregando ${rota}...</p>
+        </div>
+      `;
+    }
+
+    // 2. LOGICA DE ROTEAMENTO (Onde a mágica acontece)
+    if (rota === 'dashboard') {
+      // ANTES: container.innerHTML = 'Em construção...'
+      // AGORA: Busca o HTML real no servidor
+      google.script.run
+        .withSuccessHandler(html => injetarConteudo(container, html))
+        .withFailureHandler(erro => mostrarErro(container, erro))
+        .getPageDashboard(); // <--- Chama a função que criamos no Controller
+    
+    } else if (rota === 'clientes') {
+      google.script.run
+        .withSuccessHandler(html => injetarConteudo(container, html))
+        .withFailureHandler(erro => mostrarErro(container, erro))
+        .getPageClientes();
+    
+    } else if (rota === 'processos') { 
+      google.script.run
+        .withSuccessHandler(html => injetarConteudo(container, html))
+        .withFailureHandler(erro => mostrarErro(container, erro))
+        .getPageProcessos();
+
+    } else if (rota === 'redacao') {
+      container.innerHTML = '<div class="p-6 text-center text-slate-500 bg-white rounded shadow">Módulo de Redação em breve.</div>';
+    }
+  }
+
+  /**
+   * EXECUTOR DE SCRIPTS (Injeta HTML e roda o JS)
+   */
+  function injetarConteudo(container, html) {
+    // 1. Coloca o HTML na tela
+    container.innerHTML = html;
+    
+    // 2. Encontra os scripts que vieram no HTML injetado
+    const scripts = container.getElementsByTagName('script');
+    
+    // 3. Executa um por um usando window.eval para garantir escopo global
+    // Convertemos para Array para evitar problemas com HTMLCollection dinâmico
+    const scriptsArray = Array.from(scripts);
+    
+    scriptsArray.forEach(scriptTag => {
+      const codigoJS = scriptTag.innerText;
+      
+      // Remove a tag <script> do HTML para limpar o DOM
+      if(scriptTag.parentNode) {
+        scriptTag.parentNode.removeChild(scriptTag);
+      }
+
+      // Executa o código JS
+      try {
+        if (codigoJS.trim()) {
+           window.eval(codigoJS); 
+        }
+      } catch (e) {
+        console.error("Erro ao executar script do módulo:", e);
+        console.error("Código com erro:", codigoJS);
+        alert("Erro de Script no módulo: " + e.message);
+      }
+    });
+
+    console.log("Conteúdo injetado e scripts executados.");
+  }
+
+  function mostrarErro(container, erro) {
+    console.error(erro);
+    container.innerHTML = `
+      <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4 rounded shadow">
+        <p class="font-bold">Erro de Conexão</p>
+        <p>${erro.message}</p>
+        <p class="text-xs mt-2">Tente recarregar a página (F5).</p>
+      </div>
+    `;
+  }
+</script>
