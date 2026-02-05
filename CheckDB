@@ -1,0 +1,28 @@
+function verificarOQueOSistemaVe() {
+  try {
+    const abaProcessos = TVOCore.CONFIG.SHEET_NAMES.PROCESSOS;
+    const ssId = TVOCore.CONFIG.IDS.SPREADSHEET;
+    
+    const ss = SpreadsheetApp.openById(ssId);
+    const ws = ss.getSheetByName(abaProcessos);
+    
+    if (!ws) {
+      Logger.log("❌ ERRO: A aba '" + abaProcessos + "' não existe na planilha!");
+      return;
+    }
+    
+    const valores = ws.getDataRange().getValues();
+    Logger.log("✅ Aba encontrada: " + abaProcessos);
+    Logger.log("📊 Total de linhas detectadas (incluindo cabeçalho): " + valores.length);
+    
+    if (valores.length > 0) {
+      Logger.log("📝 Cabeçalhos na planilha: " + valores[0].join(" | "));
+    }
+    
+    const processos = TVOCore.Repo_Processos.listar();
+    Logger.log("🚀 Resultado do Repo_Processos.listar(): " + processos.length + " itens.");
+    
+  } catch (e) {
+    Logger.log("❌ ERRO CRÍTICO: " + e.message);
+  }
+}
