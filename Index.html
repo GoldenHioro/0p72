@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <title>Rodrigues Novais CRM</title>
+    </head>
+  <body>
+
+  <body class="bg-slate-100 font-sans text-slate-800 h-screen overflow-hidden flex">
+
+    <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-2xl z-20">
+      <div class="h-16 flex items-center justify-center border-b border-slate-700 bg-slate-950">
+        <div class="text-center">
+          <h1 class="text-lg font-bold tracking-widest text-blue-400">RODRIGUES NOVAIS</h1>
+          <p class="text-[10px] text-slate-400 uppercase tracking-widest">Sistema Jurídico</p>
+        </div>
+      </div>
+
+      <nav class="flex-1 overflow-y-auto py-4 space-y-1">
+        
+        <button onclick="navegar('dashboard')" class="w-full text-left px-6 py-3 text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center border-l-4 border-transparent hover:border-blue-500 group">
+          <i class="fas fa-chart-pie w-6 group-hover:text-blue-400 transition"></i> 
+          <span class="font-medium">Dashboard</span>
+        </button>
+
+        <button onclick="navegar('clientes')" class="w-full text-left px-6 py-3 text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center border-l-4 border-transparent hover:border-blue-500 group">
+          <i class="fas fa-users w-6 group-hover:text-blue-400 transition"></i> 
+          <span class="font-medium">Clientes</span>
+        </button>
+
+        <button onclick="navegar('processos')" class="w-full text-left px-6 py-3 text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center border-l-4 border-transparent hover:border-blue-500 group">
+          <i class="fas fa-gavel w-6 group-hover:text-blue-400 transition"></i> 
+          <span class="font-medium">Processos</span>
+        </button>
+        
+        <button onclick="navegar('redacao')" class="w-full text-left px-6 py-3 text-slate-300 hover:bg-slate-800 hover:text-white transition flex items-center border-l-4 border-transparent hover:border-blue-500 group">
+          <i class="fas fa-file-contract w-6 group-hover:text-blue-400 transition"></i> 
+          <span class="font-medium">Redação</span>
+        </button>
+
+      </nav>
+
+      <div class="p-4 bg-slate-950 text-xs text-center text-slate-600 border-t border-slate-800">
+        GAIUS System v2.0
+      </div>
+    </aside>
+
+    <main class="flex-1 flex flex-col relative h-full">
+      
+      <header class="h-16 bg-white shadow-sm flex justify-between items-center px-8 z-10">
+        <h2 id="titulo-pagina" class="text-xl font-semibold text-slate-700">Bem-vindo</h2>
+        
+        <div class="flex items-center gap-4">
+          <div class="text-right hidden sm:block">
+            <p class="text-sm font-bold text-slate-700">Doutor(a)</p>
+            <p class="text-xs text-slate-500">Administrador</p>
+          </div>
+          <div class="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold border border-blue-200">
+            DR
+          </div>
+        </div>
+      </header>
+
+      <div id="app-content" class="flex-1 overflow-auto p-8 bg-slate-100">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 fade-in">
+          <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-blue-500">
+            <h3 class="text-slate-400 text-xs font-bold uppercase">Clientes Ativos</h3>
+            <p class="text-3xl font-bold text-slate-700 mt-2">--</p>
+          </div>
+          <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-green-500">
+            <h3 class="text-slate-400 text-xs font-bold uppercase">Processos Ativos</h3>
+            <p class="text-3xl font-bold text-slate-700 mt-2">--</p>
+          </div>
+           <div class="bg-white p-6 rounded-lg shadow-sm border-l-4 border-purple-500">
+            <h3 class="text-slate-400 text-xs font-bold uppercase">Movimentações Hoje</h3>
+            <p class="text-3xl font-bold text-slate-700 mt-2">--</p>
+          </div>
+        </div>
+      </div>
+
+    </main>
+
+    <?!= include('Global.js'); ?>
+
+        <script>
+      // Diagnóstico de Frontend
+      window.addEventListener('load', function() {
+        console.log("WebApp Carregado (Modo DEV).");
+        
+        // Força um teste visual
+        const statusDiv = document.createElement('div');
+        statusDiv.style.position = 'fixed';
+        statusDiv.style.bottom = '10px';
+        statusDiv.style.right = '10px';
+        statusDiv.style.backgroundColor = '#000';
+        statusDiv.style.color = '#0f0';
+        statusDiv.style.padding = '5px 10px';
+        statusDiv.style.borderRadius = '5px';
+        statusDiv.style.fontSize = '10px';
+        statusDiv.style.zIndex = '9999';
+        statusDiv.innerHTML = 'GAIUS: JS Ativo';
+        document.body.appendChild(statusDiv);
+      });
+      
+      // Função de segurança caso a injeção falhe
+      window.onerror = function(msg, url, line) {
+        alert("Erro de Script JS: " + msg + "\nLinha: " + line);
+      };
+    </script>
+
+  </body>
+</html>
