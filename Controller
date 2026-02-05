@@ -1,0 +1,306 @@
+// =====================================================
+// CONTROLLER.gs – VERSÃO COM DASHBOARD INTEGRADO
+// =====================================================
+
+/**
+ * Ponto de Entrada: Renderiza a estrutura base (Index)
+ */
+function doGet(e) {
+  return HtmlService.createTemplateFromFile('Index')
+    .evaluate()
+    .setTitle('Rodrigues Novais CRM')
+    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL)
+    .addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+
+/**
+ * Utilitário para incluir parciais (CSS/JS)
+ */
+function include(filename) {
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
+}
+
+// =====================================================
+// MÓDULO DE INTEGRAÇÕES EXTERNAS (Tasks, Calendar, TJDFT)
+// =====================================================
+
+/**
+ * 1. GOOGLE TASKS
+ * Busca tarefas da lista "Escritório"
+ */
+function apiGetTasks() {
+  try {
+    // Tenta obter as listas de tarefas do usuário
+    const taskLists = Tasks.Tasklists.list();
+    if (!taskLists.items) return [];
+
+    const lista = taskLists.items.find(l => l.title === "Escritório");
+    if (!lista) return [{ title: "Crie a lista 'Escritório'" }];
+
+    const tasks = Tasks.Tasks.list(lista.id, { showCompleted: false });
+    return (tasks.items || []).map(t => ({ title: t.title }));
+    
+  } catch (e) {
+    Logger.log("Erro no Tasks: " + e.message);
+    // Se der erro de permissão, o retorno abaixo aparece no Dashboard
+    return [{ title: "Erro: Autorize o acesso ao Tasks" }];
+  }
+}
+
+/**
+ * 2. CALENDÁRIO TJDFT (Scraper Real com Cache)
+ * Lê: https://www.tjdft.jus.br/feriados-e-expedientes-suspensos
+ */
+/**
+ * CALENDÁRIO TJDFT 2026 - BASEADO NA LISTA OFICIAL FORNECIDA
+ */
+function apiGetFeriadosTJDFT() {
+  const base = [
+    "16/02/2026 FERIADO FORENSE", "17/02/2026 FERIADO FORENSE", "18/02/2026 QUARTA-FEIRA DE CINZAS",
+    "01/04/2026 SEMANA SANTA", "02/04/2026 SEMANA SANTA", "03/04/2026 SEMANA SANTA",
+    "20/04/2026 PONTO FACULTATIVO", "21/04/2026 TIRADENTES", "01/05/2026 DIA DO TRABALHO",
+    "04/06/2026 CORPUS CHRISTI", "11/08/2026 DIA DO ADVOGADO", "07/09/2026 INDEPENDÊNCIA",
+    "12/10/2026 N. SRA. APARECIDA", "02/11/2026 FINADOS", "15/11/2026 PROCLAMAÇÃO DA REPÚBLICA",
+    "20/11/2026 CONSCIÊNCIA NEGRA", "08/12/2026 DIA DA JUSTIÇA", "20/12/2026 RECESSO FORENSE"
+  ];
+
+  // Data de hoje sem horas para comparação justa
+  const hoje = new Date();
+  hoje.setHours(0,0,0,0);
+
+  const resultado = base.map(item => {
+    const dataPartes = item.substring(0, 10).split('/');
+    const d = parseInt(dataPartes[0], 10);
+    const m = parseInt(dataPartes[1], 10) - 1;
+    const y = parseInt(dataPartes[2], 10);
+    const dataObj = new Date(y, m, d);
+    
+    return {
+      data: item.substring(0, 5),
+      nome: item.substring(11),
+      val: dataObj.getTime()
+    };
+  })
+  .filter(f => f.val >= hoje.getTime()) // Filtra feriados futuros ou de hoje
+  .sort((a, b) => a.val - b.val) // Garante a ordem cronológica
+  .slice(0, 6); // Pega os 6 primeiros
+
+  return resultado;
+}
+
+function apiGetHistorico(numProcesso) {
+  const json = TVOCore.apiObterHistorico(numProcesso);
+  return JSON.parse(json || "[]");
+}
+
+function apiVincular(idProcesso, idCliente) {
+  const res = JSON.parse(TVOCore.apiVincularCliente(idProcesso, idCliente));
+  if (res.erro) throw new Error(res.erro);
+  return res;
+}
+
+function apiGetFilaWhatsapp() {
+  return JSON.parse(TVOCore.apiGetFilaWhatsapp() || "[]");
+}
+// E a rota getPageNotificacoes continua a mesma
+
+
+/**
+ * 3. SYNC CALENDAR (Lógica 0x61 Completa)
+ * Cria eventos na agenda e verifica conflitos
+ */
+function apiGetAlertas() {
+  const alertas = [];
+  try {
+    // Busca dados da planilha
+    const json = TVOCore.getMovimentacoesSafe ? TVOCore.getMovimentacoesSafe() : "[]";
+    const movs = JSON.parse(json);
+    
+    // Filtra audiências
+    const audiencias = movs.filter(m => 
+      m.DESCRICAO && m.DESCRICAO.toUpperCase().includes("AUDIÊNCIA")
+    );
+
+    if (audiencias.length === 0) return [];
+
+    const calendar = CalendarApp.getDefaultCalendar();
+    const hoje = new Date();
+    const limiteFuturo = new Date();
+    limiteFuturo.setDate(hoje.getDate() + 90); // Olha 90 dias pra frente
+
+    // Pega todos os eventos dos próximos 3 meses para comparar de uma vez (mais rápido)
+    const eventosFuturos = calendar.getEvents(hoje, limiteFuturo);
+
+    audiencias.forEach(aud => {
+      if (!aud.DATA_MOV) return;
+      const dataAud = new Date(aud.DATA_MOV);
+      
+      // Verifica se já existe evento nesse horário no Calendar
+      const conflito = eventosFuturos.find(ev => 
+        Math.abs(ev.getStartTime() - dataAud) < 60000 // Diferença menor que 1 min
+      );
+
+      if (conflito) {
+        // Se já existe, verificamos se há SOBREPOSIÇÃO com OUTRO evento
+        const outros = eventosFuturos.filter(ev => 
+          ev.getStartTime() <= dataAud && ev.getEndTime() >= dataAud && ev.getId() !== conflito.getId()
+        );
+        
+        if (outros.length > 0) {
+          alertas.push({
+            titulo: "⚠️ CHOQUE DE HORÁRIO",
+            data: dataAud.toLocaleDateString('pt-BR'),
+            detalhe: `Audiência colide com: ${outros[0].getTitle()}`
+          });
+        }
+      } else {
+        // LÓGICA DE CRIAÇÃO AUTOMÁTICA (Sync 0x61)
+        // Se não tem evento, o sistema DEVERIA criar.
+        // Por segurança, apenas avisamos que falta criar por enquanto.
+        alertas.push({
+          titulo: "📅 Falta Adicionar à Agenda",
+          data: dataAud.toLocaleDateString('pt-BR'),
+          detalhe: `Audiência do Proc. ${aud.PROCESSO_NUM}`
+        });
+        
+        // Se quiser que crie sozinho, descomente a linha abaixo:
+        // calendar.createEvent("Audiência: " + aud.PROCESSO_NUM, dataAud, new Date(dataAud.getTime() + 3600000));
+      }
+    });
+
+    return alertas;
+
+  } catch (e) {
+    Logger.log("Erro Sync Calendar: " + e.message);
+    return [];
+  }
+}
+
+/**
+ * Atualização da estatística (Dashboard)
+ */
+function apiGetDashboardStats() {
+  try {
+    var clientes = apiListarClientes();
+    var processos = apiListarProcessos();
+
+    return {
+      totalClientes: Array.isArray(clientes) ? clientes.length : 0,
+      totalProcessos: Array.isArray(processos) ? processos.length : 0
+    };
+  } catch (e) {
+    return { totalClientes: 0, totalProcessos: 0 };
+  }
+}
+
+// =====================================================
+// ROTEAMENTO DE PÁGINAS
+// =====================================================
+
+function getPageClientes() { 
+  return include('Page_Clientes'); 
+}
+
+function getPageProcessos() { 
+  return include('Page_Processos'); 
+}
+
+// [NOVO] Rota para o Dashboard
+function getPageDashboard() {
+  return include('Page_Dashboard');
+}
+
+// =====================================================
+// API GATEWAY PARA A BIBLIOTECA (TVOCore)
+// =====================================================
+
+/**
+ * API: Listar Clientes
+ */
+function apiListarClientes() {
+  try {
+    return TVOCore.listarClientes();
+  } catch (e) {
+    Logger.log("Erro ao listar clientes: " + e.message);
+    return [];
+  }
+}
+
+/**
+ * API: Listar Processos – versão DEFINITIVA e SEGURA
+ */
+function apiListarProcessos() {
+  try {
+    // Verifica se a função segura existe na biblioteca
+    if (typeof TVOCore.getProcessosSafe === 'function') {
+      var respostaJson = TVOCore.getProcessosSafe();
+
+      // Garante que veio algo válido
+      if (!respostaJson) {
+        Logger.log("getProcessosSafe retornou vazio");
+        return [];
+      }
+
+      var dados = JSON.parse(respostaJson);
+
+      // Se a própria biblioteca retornou erro
+      if (dados.erro) {
+        throw new Error(dados.erro);
+      }
+
+      return dados;
+
+    } else {
+      // Fallback caso a versão segura não exista
+      return TVOCore.listarProcessos();
+    }
+  } catch (e) {
+    Logger.log("Erro no Controller apiListarProcessos: " + e.message);
+    return [];
+  }
+}
+
+/**
+ * API: Salvar Cliente
+ */
+function apiSalvarCliente(form) {
+  try {
+    return TVOCore.salvarCliente(form);
+  } catch (e) {
+    Logger.log("Erro ao salvar cliente: " + e.message);
+    throw new Error("Erro no Core: " + e.message);
+  }
+}
+
+/**
+ * [NOVO] API: Estatísticas para o Dashboard
+ * Reutiliza as funções seguras acima para contar os totais
+ */
+function apiGetDashboardStats() {
+  try {
+    // Busca as listas usando as funções que já tratam erros
+    var clientes = apiListarClientes();
+    var processos = apiListarProcessos(); // Usa a versão blindada automaticamente
+
+    return {
+      totalClientes: Array.isArray(clientes) ? clientes.length : 0,
+      totalProcessos: Array.isArray(processos) ? processos.length : 0,
+      movsHoje: 0 // Implementaremos futuramente com a aba Movimentações
+    };
+    
+  } catch (e) {
+    Logger.log("Erro ao gerar estatísticas: " + e.message);
+    // Retorna traços em vez de erro para não quebrar o layout visual
+    return { totalClientes: '-', totalProcessos: '-', movsHoje: '-' };
+  }
+}
+
+/**
+ * Endpoint de diagnóstico rápido
+ */
+function healthCheck() {
+  return {
+    status: 'online',
+    biblioteca: (typeof TVOCore !== 'undefined')
+  };
+}
