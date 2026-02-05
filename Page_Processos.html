@@ -1,0 +1,208 @@
+<div class="fade-in space-y-6">
+  <div class="flex justify-between items-center">
+    <h2 class="text-2xl font-bold text-slate-800">Processos</h2>
+    <div class="space-x-2">
+      <button onclick="carregarProcessos()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-sm">
+        <i class="fas fa-sync-alt"></i> Atualizar
+      </button>
+    </div>
+  </div>
+
+  <div id="lista-processos" class="space-y-4">
+    <div class="text-center py-12 text-slate-400">
+      <i class="fas fa-circle-notch fa-spin fa-2x mb-2"></i>
+      <p>Carregando processos...</p>
+    </div>
+  </div>
+</div>
+
+<script>
+  // INICIALIZAÇÃO
+  (function() {
+    carregarProcessos();
+  })();
+
+  function carregarProcessos() {
+    google.script.run
+      .withSuccessHandler(renderizarProcessos)
+      .withFailureHandler(erro => {
+         document.getElementById('lista-processos').innerHTML = `<div class="p-4 bg-red-50 text-red-600 rounded">Erro: ${erro.message}</div>`;
+      })
+      .apiListarProcessos();
+  }
+
+  function renderizarProcessos(processos) {
+    const container = document.getElementById('lista-processos');
+    container.innerHTML = '';
+
+    if (!processos || processos.length === 0) {
+      container.innerHTML = '<div class="text-center text-slate-400 py-10 bg-white rounded border">Nenhum processo cadastrado.</div>';
+      return;
+    }
+
+    processos.forEach(proc => {
+      // Lógica de Vínculo
+      const needsLink = proc.CLIENTE_ID === "Pendente Vinculo" || !proc.CLIENTE_ID;
+      
+      const clienteBadge = needsLink
+        ? `<button onclick="abrirModalVinculo('${proc.ID}', '${proc.NUMERO}')" class="bg-yellow-100 text-yellow-800 text-xs font-bold px-3 py-1 rounded-full hover:bg-yellow-200 transition border border-yellow-200">
+             <i class="fas fa-link mr-1"></i> VINCULAR CLIENTE
+           </button>`
+        : `<span class="bg-slate-100 text-slate-600 text-xs font-bold px-3 py-1 rounded-full border border-slate-200">
+             <i class="fas fa-user mr-1"></i> ${proc.NOME_CLIENTE}
+           </span>`;
+
+      const card = document.createElement('div');
+      card.className = "bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition group";
+      
+      card.innerHTML = `
+        <div class="flex justify-between items-start">
+          <div class="flex-1">
+            <div class="flex items-center gap-2 mb-2">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-blue-500 bg-blue-50 px-2 py-0.5 rounded">${proc.ORGAO || 'Vara não id.'}</span>
+              ${clienteBadge}
+            </div>
+            
+            <h3 class="text-lg font-bold text-slate-800 font-mono">${proc.NUMERO}</h3>
+            <p class="text-sm text-slate-500 mt-1 line-clamp-1">${proc.ASSUNTO || 'Sem assunto'}</p>
+            
+            <div class="mt-3 flex gap-4 text-xs text-slate-400">
+              <div><strong class="text-slate-600">Autor:</strong> ${proc.POLO_ATIVO || '-'}</div>
+              <div><strong class="text-slate-600">Réu:</strong> ${proc.POLO_PASSIVO || '-'}</div>
+            </div>
+          </div>
+
+          <div class="ml-4 flex flex-col gap-2">
+            <button onclick="verHistorico('${proc.NUMERO}')" class="w-10 h-10 flex items-center justify-center rounded-full bg-slate-50 text-slate-400 hover:bg-blue-500 hover:text-white transition shadow-sm" title="Ver Movimentações">
+              <i class="fas fa-history"></i>
+            </button>
+          </div>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  // --- AÇÃO: VER HISTÓRICO ---
+  // --- AÇÃO: VER HISTÓRICO (Versão Destravada) ---
+  window.verHistorico = function(numProcesso) {
+    // Validação de Segurança
+    if (typeof Swal === 'undefined') { 
+        alert("Erro: SweetAlert não carregou. Verifique o Index.html."); 
+        return; 
+    }
+
+    Swal.fire({
+      title: 'Carregando...',
+      html: '<p class="text-sm text-slate-500">Buscando na planilha...</p>',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+        
+        google.script.run
+          .withSuccessHandler(movs => {
+            // Se chegou aqui, o servidor respondeu!
+            if (!movs || movs.length === 0) {
+              Swal.fire('Sem registros', 'Nenhuma movimentação encontrada na aba "DB_Movimentacoes" para este número.', 'info');
+              return;
+            }
+
+            let html = '<div class="text-left max-h-[60vh] overflow-y-auto pr-2 space-y-3">';
+            
+            movs.forEach(m => {
+              // Tratamento visual da data (feita no seu PC, não no servidor)
+              let dataVisivel = "--/--/----";
+              try {
+                  // Tenta criar data, se falhar, usa a string original
+                  let d = new Date(m.DATA_MOV);
+                  if(!isNaN(d.getTime())) {
+                      dataVisivel = d.toLocaleDateString('pt-BR');
+                  } else {
+                      dataVisivel = m.DATA_MOV ? String(m.DATA_MOV).substring(0,10) : "Data n/d";
+                  }
+              } catch(e) { dataVisivel = m.DATA_MOV; }
+
+              html += `
+                <div class="relative pl-4 border-l-2 border-slate-200 pb-2">
+                  <div class="absolute -left-[5px] top-1 w-2.5 h-2.5 rounded-full bg-blue-400"></div>
+                  <p class="text-[10px] font-bold text-slate-400 uppercase">${dataVisivel}</p>
+                  <p class="text-xs text-slate-700 mt-0.5 leading-snug">${m.DESCRICAO || 'Sem descrição'}</p>
+                </div>`;
+            });
+            html += '</div>';
+
+            Swal.fire({
+              title: `Proc. ${numProcesso}`,
+              html: html,
+              width: '600px',
+              showConfirmButton: true,
+              confirmButtonText: 'Fechar'
+            });
+          })
+          .withFailureHandler(erro => {
+             // Se o servidor quebrar, ele avisa aqui
+             Swal.fire('Erro no Servidor', erro.message, 'error');
+          })
+          .apiGetHistorico(numProcesso);
+      }
+    });
+  };
+  
+
+  // --- AÇÃO: VINCULAR CLIENTE ---
+  window.abrirModalVinculo = function(idProcesso, numProcesso) {
+    if (typeof Swal === 'undefined') { alert("Erro: SweetAlert não carregou. Dê F5."); return; }
+
+    const btn = event.target.closest('button'); 
+    const originalContent = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+
+    google.script.run.withSuccessHandler(clientes => {
+        btn.innerHTML = originalContent; 
+        
+        let options = clientes.map(c => `<option value="${c.ID}">${c.NOME} (CPF: ${c.CPF || '-'})</option>`).join('');
+        
+        Swal.fire({
+            title: 'Vincular Cliente',
+            html: `
+                <div class="text-left mb-4">
+                    <label class="text-xs font-bold text-slate-500 uppercase">Processo</label>
+                    <p class="font-mono bg-slate-100 p-2 rounded text-sm">${numProcesso}</p>
+                </div>
+                <div class="text-left">
+                    <label class="text-xs font-bold text-slate-500 uppercase">Selecione o Cliente</label>
+                    <select id="selCliente" class="w-full p-2 border border-slate-300 rounded mt-1 bg-white focus:ring-2 focus:ring-blue-500 outline-none">
+                        <option value="" disabled selected>-- Escolha na lista --</option>
+                        ${options}
+                    </select>
+                </div>
+            `,
+            showCancelButton: true,
+            confirmButtonText: 'Salvar Vínculo',
+            confirmButtonColor: '#2563eb',
+            preConfirm: () => {
+                const val = document.getElementById('selCliente').value;
+                if (!val) Swal.showValidationMessage('Selecione um cliente.');
+                return val;
+            }
+        }).then((result) => {
+            if (result.isConfirmed) {
+                Swal.fire({title: 'Salvando...', didOpen: () => Swal.showLoading()});
+                
+                google.script.run.withSuccessHandler(res => {
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'Vinculado!',
+                        text: `Cliente definido como: ${res.papel}`,
+                        timer: 2000,
+                        showConfirmButton: false
+                    });
+                    carregarProcessos(); 
+                }).withFailureHandler(e => {
+                    Swal.fire('Erro', e.message, 'error');
+                }).apiVincular(idProcesso, result.value);
+            }
+        });
+    }).apiListarClientes();
+  };
+</script>
