@@ -1,0 +1,187 @@
+<div class="fade-in space-y-6">
+  
+  <div class="flex justify-between items-center bg-white p-4 rounded-lg shadow-sm">
+    <div class="relative">
+      <i class="fas fa-search absolute left-3 top-3 text-gray-400"></i>
+      <input type="text" placeholder="Buscar cliente..." class="pl-10 pr-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 text-sm">
+    </div>
+    <button onclick="window.abrirModalCliente()" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-6 rounded-lg shadow transition flex items-center gap-2">
+      <i class="fas fa-plus"></i> Novo Cliente
+    </button>
+  </div>
+
+  <div class="bg-white rounded-lg shadow-sm overflow-hidden border border-slate-200">
+    <table class="min-w-full divide-y divide-slate-200">
+      <thead class="bg-slate-50">
+        <tr>
+          <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Nome / Contato</th>
+          <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Documento</th>
+          <th class="px-6 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">Status</th>
+          <th class="px-6 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">Ações</th>
+        </tr>
+      </thead>
+      <tbody id="tabela-clientes-body" class="bg-white divide-y divide-slate-200">
+        </tbody>
+    </table>
+  </div>
+
+</div>
+
+<div id="modal-cliente" class="fixed inset-0 z-50 hidden">
+  <div class="absolute inset-0 bg-black bg-opacity-50 backdrop-blur-sm transition-opacity" onclick="window.fecharModalCliente()"></div>
+  
+  <div class="relative bg-white rounded-xl shadow-2xl max-w-lg w-full mx-auto mt-20 p-6 fade-in-up">
+    <div class="flex justify-between items-center mb-6">
+      <h3 class="text-xl font-bold text-slate-800">Novo Cliente</h3>
+      <button onclick="window.fecharModalCliente()" class="text-slate-400 hover:text-slate-600"><i class="fas fa-times text-xl"></i></button>
+    </div>
+
+    <form id="form-cliente" class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Nome Completo</label>
+        <input type="text" name="NOME" class="w-full border border-slate-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none" required>
+      </div>
+      
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">CPF/CNPJ</label>
+          <input type="text" name="CPF_CNPJ" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none">
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-slate-700 mb-1">Telefone</label>
+          <input type="text" name="TELEFONE" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none">
+        </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+        <input type="email" name="EMAIL" class="w-full border border-slate-300 rounded-lg px-3 py-2 outline-none">
+      </div>
+
+      <div class="flex justify-end gap-3 mt-6">
+        <button type="button" onclick="window.fecharModalCliente()" class="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium">Cancelar</button>
+        <button type="button" onclick="window.salvarCliente(this)" class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium shadow flex items-center gap-2">
+          <span>Salvar</span> <i class="fas fa-arrow-right text-xs"></i>
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  console.log("Módulo Clientes: Script Iniciado.");
+
+  // =========================================================
+  // 1. DEFINIÇÃO DAS FUNÇÕES (Primeiro definimos)
+  // =========================================================
+
+  window.carregarTabelaClientes = function() {
+    const tbody = document.getElementById('tabela-clientes-body');
+    if(!tbody) return; 
+
+    tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-10 text-center text-slate-400"><i class="fas fa-circle-notch fa-spin mr-2"></i>Buscando dados no servidor...</td></tr>';
+
+    google.script.run
+      .withSuccessHandler(window.renderizarListaClientes)
+      .withFailureHandler(err => {
+        if(tbody) tbody.innerHTML = `<tr><td colspan="4" class="px-6 py-4 text-center text-red-500">Erro: ${err.message}</td></tr>`;
+      })
+      .apiListarClientes();
+  };
+
+  window.renderizarListaClientes = function(clientes) {
+    const tbody = document.getElementById('tabela-clientes-body');
+    if(!tbody) return;
+    tbody.innerHTML = '';
+
+    if (!clientes || clientes.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-10 text-center text-slate-400">Nenhum cliente cadastrado.</td></tr>';
+      return;
+    }
+
+    clientes.forEach(cli => {
+      const tr = document.createElement('tr');
+      tr.className = "hover:bg-slate-50 transition border-b border-slate-100";
+      tr.innerHTML = `
+        <td class="px-6 py-4 whitespace-nowrap">
+          <div class="flex items-center">
+            <div class="h-8 w-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs mr-3">
+              ${cli.NOME ? cli.NOME.charAt(0).toUpperCase() : '?'}
+            </div>
+            <div>
+              <div class="text-sm font-medium text-slate-900">${cli.NOME || 'Sem Nome'}</div>
+              <div class="text-xs text-slate-500">${cli.EMAIL || ''}</div>
+            </div>
+          </div>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-600">
+          ${cli.CPF_CNPJ || '-'}
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap">
+          <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+            Ativo
+          </span>
+        </td>
+        <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+          <button class="text-slate-400 hover:text-blue-600 mx-2" title="Editar"><i class="fas fa-edit"></i></button>
+          <button class="text-slate-400 hover:text-blue-600 mx-2" title="Abrir Pasta"><i class="fas fa-folder-open"></i></button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  };
+
+  // --- Funções do Modal ---
+  window.abrirModalCliente = function() { 
+    document.getElementById('modal-cliente').classList.remove('hidden'); 
+  };
+  
+  window.fecharModalCliente = function() { 
+    document.getElementById('modal-cliente').classList.add('hidden'); 
+  };
+
+  window.salvarCliente = function(btn) {
+    const form = document.getElementById('form-cliente');
+    const dados = {
+      NOME: form.NOME.value,
+      CPF_CNPJ: form.CPF_CNPJ.value,
+      EMAIL: form.EMAIL.value,
+      TELEFONE: form.TELEFONE.value
+    };
+
+    if(!dados.NOME) { alert("Nome é obrigatório"); return; }
+
+    const originalText = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-circle-notch fa-spin"></i> Salvando...';
+    btn.disabled = true;
+
+    google.script.run
+      .withSuccessHandler(res => {
+        alert(res.msg);
+        window.fecharModalCliente();
+        form.reset();
+        window.carregarTabelaClientes();
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      })
+      .withFailureHandler(err => {
+        alert("Erro: " + err.message);
+        btn.innerHTML = originalText;
+        btn.disabled = false;
+      })
+      .apiSalvarCliente(dados);
+  };
+
+  // =========================================================
+  // 2. EXECUÇÃO (Chamamos por último)
+  // =========================================================
+  (function() {
+    console.log("Chamando window.carregarTabelaClientes...");
+    if(typeof window.carregarTabelaClientes === 'function') {
+       window.carregarTabelaClientes();
+    } else {
+       console.error("ERRO CRÍTICO: Função carregarTabelaClientes não foi definida.");
+    }
+  })();
+
+</script>
