@@ -1,0 +1,165 @@
+<div class="fade-in space-y-6 pb-10">
+
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+      <div>
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Clientes</p>
+        <p class="text-2xl font-bold text-slate-800" id="kpi-clientes">-</p>
+      </div>
+      <i class="fas fa-users text-blue-500 bg-blue-50 p-2 rounded-lg"></i>
+    </div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+      <div>
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Processos</p>
+        <p class="text-2xl font-bold text-slate-800" id="kpi-processos">-</p>
+      </div>
+      <i class="fas fa-gavel text-green-500 bg-green-50 p-2 rounded-lg"></i>
+    </div>
+    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between">
+      <div>
+        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Status Robô</p>
+        <div class="flex items-center gap-2 mt-1">
+          <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+          <span class="text-xs font-bold text-slate-600">ONLINE</span>
+        </div>
+      </div>
+      <i class="fas fa-robot text-slate-400 bg-slate-50 p-2 rounded-lg"></i>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <div class="lg:col-span-1 space-y-4">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="bg-red-50 px-4 py-3 border-b border-red-100 flex justify-between items-center">
+          <h3 class="text-sm font-bold text-red-700 flex items-center gap-2">
+            <i class="fas fa-exclamation-triangle"></i> Avisos e Alertas
+          </h3>
+        </div>
+        <div id="container-alertas" class="p-4 space-y-3 min-h-[150px]">
+          <p class="text-xs text-slate-400 text-center py-10">Buscando conflitos de agenda...</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="lg:col-span-1 space-y-4">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="bg-slate-50 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
+          <h3 class="text-sm font-bold text-slate-700 flex items-center gap-2">
+            <i class="fas fa-calendar-day"></i> Agenda do Dia
+          </h3>
+          <div class="flex items-center gap-2">
+            <a href="https://tasks.google.com/" target="_blank" class="text-[10px] text-slate-400 hover:text-blue-500 transition">
+              <i class="fas fa-external-link-alt mr-1"></i>Tasks
+            </a>
+            <span class="text-[10px] font-bold bg-slate-700 text-white px-2 py-0.5 rounded shadow-sm" id="data-hoje">
+              --/--
+            </span>
+          </div>
+        </div>
+        <div id="container-agenda" class="p-4 space-y-3 min-h-[150px]">
+          <p class="text-xs text-slate-400 text-center py-10 italic">A carregar tarefas...</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="lg:col-span-1 space-y-4">
+      <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+        <div class="bg-blue-50 px-4 py-3 border-b border-blue-100 flex justify-between items-center">
+          <h3 class="text-sm font-bold text-blue-700 flex items-center gap-2">
+            <i class="fas fa-landmark"></i> Calendário TJDFT
+          </h3>
+          <a href="https://www.tjdft.jus.br/feriados-e-expedientes-suspensos" target="_blank" class="text-[10px] text-blue-500 hover:underline">Link Oficial</a>
+        </div>
+        <div id="container-feriados" class="p-4 space-y-2 max-h-[300px] overflow-y-auto">
+          <p class="text-xs text-slate-400 text-center py-10">Carregando feriados...</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+</div>
+
+<script>
+  (function() {
+    console.log("Dashboard V2.1: Sincronizando com Google Workspace.");
+    document.getElementById('data-hoje').innerText = new Date().toLocaleDateString('pt-BR');
+
+    // Busca KPIs
+    google.script.run
+      .withSuccessHandler(function(dados) {
+        document.getElementById('kpi-clientes').innerText = dados.totalClientes || 0;
+        document.getElementById('kpi-processos').innerText = dados.totalProcessos || 0;
+      })
+      .apiGetDashboardStats();
+
+    // Busca Feriados TJDFT
+    google.script.run
+      .withSuccessHandler(function(feriados) {
+        const container = document.getElementById('container-feriados');
+        container.innerHTML = '';
+        if(!feriados || feriados.length === 0) {
+          container.innerHTML = '<p class="text-xs text-slate-400 text-center">Nenhum feriado próximo.</p>';
+          return;
+        }
+        feriados.forEach(f => {
+          container.innerHTML += `
+            <div class="flex justify-between items-center p-2 bg-blue-50/50 rounded border-l-2 border-blue-300">
+              <span class="text-[11px] font-bold text-blue-800">${f.data}</span>
+              <span class="text-[10px] text-slate-600 truncate ml-2">${f.nome}</span>
+            </div>
+          `;
+        });
+      })
+      .apiGetFeriadosTJDFT();
+
+    // Busca Alertas e Conflitos
+    google.script.run
+      .withSuccessHandler(function(alertas) {
+        const container = document.getElementById('container-alertas');
+        container.innerHTML = '';
+        if(!alertas || alertas.length === 0) {
+          container.innerHTML = `
+            <div class="flex flex-col items-center justify-center py-6 text-slate-300">
+               <i class="fas fa-check-circle fa-2x mb-2 opacity-20"></i>
+               <p class="text-[10px] font-bold uppercase">Tudo limpo!</p>
+            </div>`;
+          return;
+        }
+        alertas.forEach(a => {
+          container.innerHTML += `
+            <div class="p-3 bg-red-50 rounded-lg border border-red-100 flex items-start gap-2">
+              <i class="fas fa-clock text-red-400 mt-1"></i>
+              <div>
+                <p class="text-[11px] font-bold text-red-800">${a.titulo}</p>
+                <p class="text-[10px] text-red-600">${a.data} - ${a.detalhe}</p>
+              </div>
+            </div>
+          `;
+        });
+      })
+      .apiGetAlertas();
+
+    // Busca Tarefas REAIS do Google Tasks (Lista Escritório)
+    google.script.run
+      .withSuccessHandler(function(tasks) {
+        const container = document.getElementById('container-agenda');
+        container.innerHTML = '';
+        if(tasks.length === 0) {
+          container.innerHTML = '<p class="text-xs text-slate-400 py-4 italic">Nenhuma tarefa pendente em "Escritório".</p>';
+          return;
+        }
+        tasks.forEach(t => {
+          container.innerHTML += `
+            <div class="flex items-center gap-3 p-2 hover:bg-slate-50 rounded-lg transition">
+               <i class="far fa-circle text-blue-400"></i>
+               <span class="text-xs text-slate-600">${t.title}</span>
+            </div>
+          `;
+        });
+      })
+      .apiGetTasks();
+
+  })();
+</script>
